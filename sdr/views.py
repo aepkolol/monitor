@@ -5,6 +5,9 @@ from django.db.models.functions import TruncSecond, TruncDate, Length
 from django.shortcuts import render
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
 from monitor.settings import BASE_DIR
 from sdr.models import *
 from sdr.signals import *
@@ -14,6 +17,9 @@ import numpy as np
 import sdr.drawer
 import uuid
 import monitor.settings
+import json
+import requests
+import os
 
 
 def get_download_filename(name, id, extension, dt):
@@ -24,6 +30,58 @@ def get_download_filename(name, id, extension, dt):
 def get_download_raw_iq_filename(name, id, frequency, sample_rate, dt):
     dt = dt.astimezone(timezone.get_current_timezone())
     return "%s%d_%s_%d_%d_fc.raw" % (name, id, dt.strftime("%Y%m%d_%H%M%S"), frequency, sample_rate)
+
+# Decorator to exempt CSRF for this view
+@csrf_exempt
+def transcribe_audio(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid request method.'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        audio_file_url = data.get('audio_file_url')
+        if not audio_file_url:
+            return JsonResponse({'error': 'No audio file URL provided.'}, status=400)
+
+        # Get the audio file
+        response = requests.get(audio_file_url)
+        if response.status_code != 200:
+            return JsonResponse({'error': 'Failed to download the audio file.'}, status=500)
+
+        # Save the audio file temporarily
+        temp_audio_path = os.path.join(settings.TEMP_DIR, 'temp_audio.mp3')  # settings.TEMP_DIR should be set in your settings.py file
+        with open(temp_audio_path, 'wb') as audio_file:
+            audio_file.write(response.content)
+
+        # Prepare the multipart form data
+        files = {
+            'file': open(temp_audio_path, 'rb'),
+            'model': (None, 'whisper-1'),
+        }
+        headers = {
+            'Authorization': f'Bearer {settings.OPENAI_API_KEY}',  # Token should be set in your settings.py file
+        }
+
+        # Send the transcription request to OpenAI
+        openai_response = requests.post(
+            'https://api.openai.com/v1/audio/transcriptions',
+            headers=headers,
+            files=files
+        )
+
+        # Clean up the temporary audio file
+        os.remove(temp_audio_path)
+
+        if openai_response.status_code == 200:
+            transcription_result = openai_response.json()
+            return JsonResponse({'transcription': transcription_result['text']})
+        else:
+            return JsonResponse({'error': 'OpenAI transcription failed.'}, status=openai_response.status_code)
+    except Exception as e:
+        # Clean up the temporary audio file in case of exception
+        if os.path.exists(temp_audio_path):
+            os.remove(temp_audio_path)
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 @login_required()

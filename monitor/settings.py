@@ -15,6 +15,9 @@ ALLOWED_HOSTS = ["*"]
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+OPENAI_API_KEY = os.getenv('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')  # Ensure your environment variable is set
+TEMP_DIR = os.path.join(BASE_DIR, 'temp')  # BASE_DIR is usually defined earlier in settings.py
+
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "public", "static")
 STATICFILES_DIRS = [os.path.join(os.path.dirname(__file__), "static/")]

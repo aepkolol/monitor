@@ -9,6 +9,54 @@ Transmission {{ transmission.begin_date }} - {{ transmission.end_date }},
 {% endblock %}
 
 {% block content %}
+
+<script type="text/javascript">
+    function transcribeAudio(audioFileUrl) {
+  
+        // Disable the button while processing
+        document.getElementById('ai-transcribe-btn').disabled = true;
+        document.getElementById('transcription-result').innerText = 'Transcribing...';
+  
+        // Send audio file URL to server for transcription
+        fetch('/api/transcribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken') // Assumes Django CSRF token is set as a cookie, for CSRF protection
+          },
+          body: JSON.stringify({ audio_file_url: audioFileUrl })
+        })
+        .then(response => response.json())
+        .then(data => {
+          // Show the transcription result
+          document.getElementById('transcription-result').innerText = data.transcription || 'Error in transcription';
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          document.getElementById('transcription-result').innerText = 'An error occurred during transcription.';
+        })
+        .finally(() => {
+            // Re-enable the button
+            document.getElementById('ai-transcribe-btn').disabled = false;
+        });
+    }
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+  </script>
+
 <div class="row mt-2">
     <div class="col-12">
         <h3>Transmission date: {{ transmission.begin_date }} - {{ transmission.end_date }} ({{ transmission.duration }})
@@ -27,6 +75,12 @@ Transmission {{ transmission.begin_date }} - {{ transmission.end_date }},
         <a href="{% url 'sdr_transmission_data' transmission.id %}?format=spectrogram" class="btn btn-primary" download>
             spectrogram</a>
         <a href="{% url 'sdr_transmission_data' transmission.id %}" class="btn btn-primary" download>decoded file</a>
+        <a href="#" id="ai-transcribe-btn" class="btn btn-primary" onclick="transcribeAudio('{% url 'sdr_transmission_data' transmission.id %}');">AI Transcribe</a>
+    </div>
+</div>
+<div class="row mt-2">
+    <div class="col-12">
+        <div id="transcription-result" style="margin-top: 20px;"></div>
     </div>
 </div>
 <div class="row mt-2">

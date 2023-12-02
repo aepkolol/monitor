@@ -6,12 +6,14 @@ from django.conf import settings
 from django.views.static import serve
 from django.views.generic.base import TemplateView
 from django.conf.urls.static import static
+from sdr.views import transcribe_audio
 
 import graphs.views
 import logs.views
 import sdr.views
 
 sdr_patterns = [
+    re_path(r'^api/transcribe/?$', transcribe_audio, name='transcribe_audio'),
     re_path(r"^spectrograms/?$", sdr.views.spectrograms, name="sdr_spectrograms"),
     re_path(r"^spectrogram/(?P<spectrogram_id>[0-9]+)/?$", sdr.views.spectrogram, name="sdr_spectrogram"),
     re_path(r"^spectrogram/(?P<spectrogram_id>[0-9]+)/data/?$", sdr.views.spectrogram_data, name="sdr_spectrogram_data"),
